@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"path/filepath"
@@ -33,8 +32,8 @@ func run() {
 	http.Handle("/", h)
 
 	// Start it up.
-	log.Printf("trofaf server listening on port %d", Options.Port)
+	INFO("Listening on port %d", Options.Port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", Options.Port), nil); err != nil {
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 }

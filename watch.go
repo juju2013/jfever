@@ -1,8 +1,6 @@
 package main
 
 import (
-	_ "fmt"
-	"log"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,19 +24,19 @@ var (
 func startWatcher() *fsnotify.Watcher {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	go bufGenSite()
 	go watch(w)
 	// Watch the posts directory
 	if err = w.Watch(PostsDir); err != nil {
 		w.Close()
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	// Watch the templates directory
 	if err = w.Watch(TemplatesDir); err != nil {
 		w.Close()
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	return w
 }
@@ -63,7 +61,7 @@ func watch(w *fsnotify.Watcher) {
 			}
 
 		case err := <-w.Error:
-			log.Println("WATCH ERROR ", err)
+			ERROR("%v", err)
 		}
 	}
 }
@@ -80,9 +78,9 @@ func bufGenSite() {
 			hitLast = hitNow
 		case <-generate:
 			if err := generateSite(); err != nil {
-				log.Println("ERROR generating site: ", err)
+  			ERROR("%v", err)
 			} else {
-				log.Println("site generated")
+				INFO("site generated")
 			}
 		}
 	}

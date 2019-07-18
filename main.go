@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -18,6 +17,7 @@ type options struct {
 	TagLine          string `short:"t" long:"tag-line" description:"the site's tag line"`
 	RecentPostsCount int    `short:"r" long:"recent-posts" description:"the number of recent posts to send to the templates" default:"5"`
 	BaseURL          string `short:"b" long:"base-url" description:"the base URL of the web site" default:"http://localhost"`
+  Debug            bool   `short:"d" long:"debug" description:"Enable debug output"`
 }
 
 type siteMeta struct {
@@ -34,13 +34,14 @@ var (
 	TemplatesDir string   // Templates directory path
 	RssURL       string   // The RSS feed URL, parsed only once and stored for convenience
 	SiteMeta     siteMeta // The site meta data can be used by posts
+  Debug        bool     // Enable debug output
 )
 
 func init() {
 	// Initialize directories
 	pwd, err := os.Getwd()
 	if err != nil {
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	PublicDir = filepath.Join(pwd, "public")
 	PostsDir = filepath.Join(pwd, "posts")
@@ -51,11 +52,11 @@ func init() {
 func storeRssURL() {
 	b, err := url.Parse(Options.BaseURL)
 	if err != nil {
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	r, err := b.Parse("/rss")
 	if err != nil {
-		log.Fatal("FATAL ", err)
+		FATAL(err.Error())
 	}
 	RssURL = r.String()
 }
@@ -78,7 +79,7 @@ func main() {
 		if !Options.NoGen {
 			// Generate the site
 			if err := generateSite(); err != nil {
-				log.Println("Error ", err)
+				INFO("generateSite failed: %v", err)
 			}
 			// Terminate if set to generate only
 			if Options.GenOnly {

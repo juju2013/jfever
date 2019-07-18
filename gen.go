@@ -5,7 +5,6 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -76,7 +75,7 @@ func compileTemplates() (err error) {
 	}
 	postTplNm = "post"
 	if _, exists = postTpls[postTplNm]; !exists {
-		return fmt.Errorf("error parsing templates: %s", err)
+		return fmt.Errorf("error parsing templates: %v", err)
 	}
 	return nil
 }
@@ -109,7 +108,7 @@ func getPosts(fis []os.FileInfo) (all, recent []*PostData) {
 		if err == nil {
 			all = append(all, lp)
 		} else {
-			log.Printf("post ignored: %s; error: %s\n", fi.Name(), err)
+			WARN("post ignored: %s; error: %s\n", fi.Name(), err)
 		}
 	}
 
