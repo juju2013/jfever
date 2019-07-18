@@ -1,0 +1,22 @@
+
+<html>
+	<head>
+		<title>This is a test 4</title>
+	</head>
+	<body>
+		
+<article>
+	<h1>This is a test 4</h1>
+	<time>2013-08-06</time>
+	<div><h1>This is a test header 4</h1>
+
+<p>And this is a test content 4.</p>
+</div>
+	
+	<a href="test3">Next</a>
+	
+	
+</article>
+
+	</body>
+</html>
