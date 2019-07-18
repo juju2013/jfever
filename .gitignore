@@ -1,6 +1,6 @@
 .DS_Store
 *.swp
 *.swo
-public/*
+examples/amber/public/*
 tags
 jfever
