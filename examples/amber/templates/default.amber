@@ -1,0 +1,6 @@
+extends base
+
+block content
+	article
+		#{fmttime(PubTime, "2006-01-02")}
+		| #{Content}

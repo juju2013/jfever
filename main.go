@@ -18,6 +18,9 @@ type options struct {
 	RecentPostsCount int    `short:"r" long:"recent-posts" description:"the number of recent posts to send to the templates" default:"5"`
 	BaseURL          string `short:"b" long:"base-url" description:"the base URL of the web site" default:"http://localhost"`
   Debug            bool   `short:"d" long:"debug" description:"Enable debug output"`
+  Src              string `short:"s" long:"src" description:"the source sub-dir name" default:"src"`
+  Out              string `short:"o" long:"out" description:"the output sub-dir name" default:"out"`
+  Template         string `short:"a" long:"template" description:"the template sub-dir name" default:"templates"`
 }
 
 type siteMeta struct {
@@ -38,14 +41,20 @@ var (
 )
 
 func init() {
+	// Parse arguments
+  _, err := flags.Parse(&Options)
+  if err != nil {
+    FATAL("A:%v",err.Error())
+  }
+
 	// Initialize directories
 	pwd, err := os.Getwd()
 	if err != nil {
 		FATAL(err.Error())
 	}
-	PublicDir = filepath.Join(pwd, "public")
-	PostsDir = filepath.Join(pwd, "posts")
-	TemplatesDir = filepath.Join(pwd, "templates")
+	PublicDir = filepath.Join(pwd, Options.Out)
+	PostsDir = filepath.Join(pwd, Options.Src)
+	TemplatesDir = filepath.Join(pwd, Options.Template)
 	initBF()
 }
 
@@ -71,23 +80,20 @@ func copyMeta() {
 }
 
 func main() {
-	// Parse the flags
-	_, err := flags.Parse(&Options)
-	if err == nil { // err != nil prints the usage automatically
-		storeRssURL()
-		copyMeta()
-		if !Options.NoGen {
-			// Generate the site
-			if err := generateSite(); err != nil {
-				INFO("generateSite failed: %v", err)
-			}
-			// Terminate if set to generate only
-			if Options.GenOnly {
-				return
-			}
-			// Start the watcher
-			defer startWatcher().Close()
-		}
+  storeRssURL()
+  copyMeta()
+  if !Options.NoGen {
+    // Generate the site
+    if err := generateSite(); err != nil {
+      INFO("generateSite failed: %v", err)
+    }
+    // Terminate if set to generate only
+    if Options.GenOnly {
+      return
+    }
+    // Start the watcher
+    defer startWatcher().Close()
+
 		// Start the web server
 		run()
 	}

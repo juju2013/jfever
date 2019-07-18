@@ -1,0 +1,77 @@
+!!! html
+// From HTML5 Boilerplate
+html.no-js[lang=D.Lang]
+	head
+		block meta
+			meta[charset="utf-8"]
+			meta[http-equiv="X-UA-Compatible"][content="IE=edge"]
+			meta[name="description"][content=D.Description]
+			meta[name="viewport"][content="width=device-width, initial-scale=1"]
+		title
+			block title
+				| #{D.Title}
+		block link
+			link[rel="shortcut icon"][href="/images/favicon.ico"]
+			link[rel="stylesheet"][href="/css/pure-min.css"]
+			<! link[rel="stylesheet"][href="/css/normalize.css"] -->
+			link[rel="stylesheet"][href="/css/main.css"]
+			link[rel="stylesheet"][href="/css/fontello.css"]
+			link[rel="stylesheet"][href="/css/local.css"]
+			link[rel="alternate"][type="application/rss+xml"][title=D.RSS][href=D.RssURL]
+
+	body
+		block header
+			div.header
+				div.title
+					a[href="/"] #{D.SiteName}
+					br
+					span.tagline #{D.TagLine}
+
+		nav#nav
+			block navigation
+				div.pure-menu.pure-menu-open.pure-menu-horizontal
+					ul
+						li
+							a[href="/"]
+								span.icon-user
+								if D.Lang == "FR"
+									|&nbsp;&nbsp;Identité
+								else
+									|&nbsp;&nbsp;About me
+						li 
+							a[href="/cv"]
+								span.flag-icon.flag-icon-fr
+								|Curriculum vitæ
+						li 
+							a[href="/resume"] My resume
+						li 
+							a[href="/about"]
+								if D.Lang == "FR"
+									|&Agrave; propos de ce site
+								else
+									|About this site
+						li 
+							a[href="/blog"] Blog
+
+
+		main
+			block content
+
+		footer
+			block footer
+				div.pure-g
+					div.pure-u-1-3
+						a[href="https://github.com/juju2013?tab=repositories"][title="github.com/juju2013"]
+							small
+								span.icon-github-circled
+								|see also my github projects
+					div.pure-u-1-3
+					div.pure-u-1-3
+						small built with a modified version of
+							a[href="https://github.com/juju2013/trofaf"] trofaf
+							| .
+				div.container.copyright
+
+	block hidden
+		hidden
+

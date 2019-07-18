@@ -4,14 +4,14 @@ html.no-js[lang="en"]
 	head
 		meta[charset="utf-8"]
 		meta[http-equiv="X-UA-Compatible"][content="IE=edge"]
-		title #{D.Title}
-		meta[name="description"][content=D.Description]
+		title #{Post.ShortPost.Title}
+		meta[name="description"][content=Post.ShortPost.Description]
 		meta[name="viewport"][content="width=device-width, initial-scale=1"]
 		link[rel="stylesheet"][href="/css/normalize.css"]
 		link[rel="stylesheet"][href="/css/main.css"]
 		link[rel="stylesheet"][href="/css/fontello.css"]
 		link[href="http://fonts.googleapis.com/css?family=Telex"][rel="stylesheet"][type="text/css"]
-		link[rel="alternate"][type="application/rss+xml"][title="D.RSS"][href=D.RssURL]
+		link[rel="alternate"][type="application/rss+xml"][title="RSS"][href=RssURL]
 	body
 		<!--[if lt IE 7]>
 			<p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
@@ -19,23 +19,22 @@ html.no-js[lang="en"]
 
 		div.header
 			div.title
-				a[href="/"] #{D.SiteName}
+				a[href="/"] #{SiteName}
 				br
-				br
-				span.tagline #{D.TagLine}
+				span.tagline #{TagLine}
 
-		nav
+		nav.hidden
 			div.container
 				div.left
 					if Prev
-						a.huge[href=Prev.D.Slug][title=Prev.D.Title] «
+						a.huge[href=Prev.Slug][title=Prev.Title] «
 					else
 						span.huge •
 				div.middle
-					span #{D.Title}
+					span #{Post.ShortPost.Title}
 				div.right
 					if Next
-						a.huge[href=Next.D.Slug][title=Next.D.Title] »
+						a.huge[href=Next.Slug][title=Next.Title] »
 					else
 						span.huge •
 				div.clearfix
@@ -54,7 +53,7 @@ html.no-js[lang="en"]
 						ul
 							each $p in Recent
 								li
-									a[href=$p.D.Slug] #{$p.D.Title}
+									a[href=$p.Slug] #{$p.Title}
 				div.clearfix
 			div.container.copyright
 				small

@@ -82,6 +82,8 @@ func compileTemplates() (err error) {
 
 // Clear the public directory, ignoring special files, subdirectories, and hidden (dot) files.
 func clearPublicDir() error {
+  // do nothing for now
+  return nil
 	// Clear the public directory, except subdirs and special files (favicon.ico & co.)
 	fis, err := ioutil.ReadDir(PublicDir)
 	if err != nil {
@@ -104,6 +106,7 @@ func clearPublicDir() error {
 func getPosts(fis []os.FileInfo) (all, recent []*PostData) {
 	all = make([]*PostData, 0, len(fis))
 	for _, fi := range fis {
+    DEBUG("Generating %v...", fi.Name())
 		lp, err := newPost(fi)
 		if err == nil {
 			all = append(all, lp)
