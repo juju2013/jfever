@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+  "runtime/debug"
 )
 
 func INFO(format string, args ...interface{}) {
@@ -23,11 +24,13 @@ func DEBUG(format string, args ...interface{}) {
 }
 
 func ERROR(format string, args ...interface{}) {
+  debug.PrintStack()
 	log.Printf("[ERROR]"+format, args...)
 }
 
 func FATAL(format string, args ...interface{}) {
 	log.Printf("[FATAL]"+format, args...)
+  debug.PrintStack()
 	os.Exit(1)
 }
 

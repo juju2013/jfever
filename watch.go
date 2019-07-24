@@ -1,11 +1,9 @@
 package main
 
 import (
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/howeyc/fsnotify"
+	"github.com/radovskyb/watcher"
 )
 
 const (
@@ -16,77 +14,58 @@ const (
 )
 
 var (
+	fwatcher *watcher.Watcher
+  
+  
 	tempo    = make(chan time.Time, 100)
 	generate = make(chan bool, 1)
 )
 
-// Create and start a watcher, watching both the posts and the templates directories.
-func startWatcher() *fsnotify.Watcher {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
+// start watch and loop till the end of time
+func beginWatch(paths ...string) {
+	fwatcher = watcher.New()
+	fwatcher.SetMaxEvents(1)
+	fwatcher.FilterOps(watcher.Rename, watcher.Move, watcher.Create, watcher.Remove, watcher.Write)
+  fwatcher.IgnoreHiddenFiles(true)
+  fwatcher.Ignore("examples")
+  
+	go fwHandler()
+
+	// Start by rebuild - and launch - your program
+	rebuild()
+
+	// The root directory for source to watch
+  for _, path := range paths {
+    if err := fwatcher.AddRecursive(path); err != nil {
+      ERROR(err.Error())
+    }
+  }
+
+	// start watch source change, will loop
+  DEBUG("Begin file watch")
+	if err := fwatcher.Start(watchEventDelay); err != nil {
 		FATAL(err.Error())
 	}
-	go bufGenSite()
-	go watch(w)
-	// Watch the posts directory
-	if err = w.Watch(PostsDir); err != nil {
-		w.Close()
-		FATAL(err.Error())
-	}
-	// Watch the templates directory
-	if err = w.Watch(TemplatesDir); err != nil {
-		w.Close()
-		FATAL(err.Error())
-	}
-	return w
 }
 
-// Receive watcher events for the directories. All events require re-generating
-// the whole site (because the template may display the n most recent posts, the
-// next and previous post, etc.). It could be fine-tuned based on what data we give
-// to the templates, but for now, lazy approach.
-func watch(w *fsnotify.Watcher) {
+
+// Handle watch events such as file change, error or exit
+func fwHandler() {
 	for {
 		select {
-		case ev := <-w.Event:
-			// Regenerate the files after the delay, reset the delay if an event is triggered
-			// in the meantime
-			ext := filepath.Ext(ev.Name)
-			// Care only about changes to markdown files in the Posts directory, or to
-			// Amber or Native Go template files in the Templates directory.
-			if strings.HasPrefix(ev.Name, PostsDir) && ext == ".md" {
-				tempo <- time.Now()
-			} else if strings.HasPrefix(ev.Name, TemplatesDir) && (ext == ".amber" || ext == ".html") {
-				tempo <- time.Now()
-			}
-
-		case err := <-w.Error:
-			ERROR("%v", err)
+		case event := <-fwatcher.Event:
+      DEBUG("Change :%v", event) // Print the event's info.
+      go rebuild()
+		case err := <-fwatcher.Error:
+			WARN(err.Error())
+		case <-fwatcher.Closed:
+			return
 		}
 	}
 }
 
-// Generate site with a buffered watch/expire channel
-func bufGenSite() {
-	hitLast := time.Now()
-	for {
-		select {
-		case hitNow := <-tempo:
-			if hitNow.Sub(hitLast) > watchEventDelay {
-				go chExpire(generate)
-			}
-			hitLast = hitNow
-		case <-generate:
-			if err := generateSite(); err != nil {
-  			ERROR("%v", err)
-			} else {
-				INFO("site generated")
-			}
-		}
-	}
+func rebuild() {
+  DEBUG("REBUILD...")
+  generateSite()
 }
 
-func chExpire(ch chan<- bool) {
-	time.Sleep(watchEventDelay)
-	ch <- true
-}

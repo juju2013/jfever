@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+  "regexp"
 	"sort"
 	"strings"
 	"time"
@@ -15,24 +16,28 @@ import (
 	"github.com/juju2013/amber"
 )
 
+// Content Management Struct
+type CMS struct {
+  path        string          // part of path relatif to SRC and OUT
+  outfiles    []os.FileInfo   // (extra) files in Out
+  subdirs     []*CMS            // subdirectories
+}
+
+// return the full Out path
+func (cms *CMS) GetOutDir() string {
+  return filepath.Join(PublicDir, cms.path)
+}
+
+// return the full Src path
+func (cms *CMS) GetSrcDir() string {
+  return filepath.Join(PostsDir, cms.path)
+}
+
 var (
 	//postTpl   *template.Template // The one and only compiled post template
 	postTpls  map[string]*template.Template // [templateName]=*compiledTemplate
 	postTplNm = "post.amber"                // The amber post template file name (native Go are compiled using ParseGlob)
-
-	// Special files in the public directory, that must not be deleted
-	specFiles = map[string]struct{}{
-		"favicon.ico":                              struct{}{},
-		"robots.txt":                               struct{}{},
-		"humans.txt":                               struct{}{},
-		"crossdomain.xml":                          struct{}{},
-		"apple-touch-icon.png":                     struct{}{},
-		"apple-touch-icon-114x114-precomposed.png": struct{}{},
-		"apple-touch-icon-144x144-precomposed.png": struct{}{},
-		"apple-touch-icon-57x57-precomposed.png":   struct{}{},
-		"apple-touch-icon-72x72-precomposed.png":   struct{}{},
-		"apple-touch-icon-precomposed.png":         struct{}{},
-	}
+  rootCMS     *CMS
 
 	funcs = template.FuncMap{
 		"fmttime": func(t time.Time, f string) string {
@@ -54,18 +59,6 @@ func (s sortablePosts) Len() int           { return len(s) }
 func (s sortablePosts) Less(i, j int) bool { return s[i].PubTime.Before(s[j].PubTime) }
 func (s sortablePosts) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-// Filter cleans the slice of FileInfo to leave only `.md` files (markdown)
-func filter(fi []os.FileInfo) []os.FileInfo {
-	for i := 0; i < len(fi); {
-		if fi[i].IsDir() || filepath.Ext(fi[i].Name()) != ".md" {
-			fi[i], fi = fi[len(fi)-1], fi[:len(fi)-1]
-		} else {
-			i++
-		}
-	}
-	return fi
-}
-
 // Compile the tempalte directory
 func compileTemplates() (err error) {
 	var exists bool
@@ -80,6 +73,123 @@ func compileTemplates() (err error) {
 	return nil
 }
 
+// scan a directory tree and generate outputs
+func genPath(dir string) {
+  rootCMS = WalkGenPath(".")
+}
+
+// Walk traverse a directory tree and generate outputs
+func WalkGenPath(dir string) *CMS {
+  DEBUG("Processing %v", dir)
+  
+  cms := CMS{path: dir}
+  cms.PopulateOut()
+  subdirs := []os.FileInfo{}
+  
+  files, err := ioutil.ReadDir(cms.GetSrcDir())
+  if err != nil {
+    WARN(err.Error())
+    return nil
+  }
+  // walk all files first
+  for _, fi := range files {
+    if fi.IsDir() {
+      subdirs = append(subdirs, fi)
+    } else {
+      fname := fi.Name()
+      DEBUG("\t... file %v\n", fname)
+      if strings.HasPrefix(fi.Name(), ".") {
+        continue
+      }
+      if matched, _ := regexp.MatchString(".*\\.md", fname); matched {
+        cms.generate(fname)
+      } else {
+        cms.copy(fname)
+      }
+    }
+  }
+  
+  // walk subdir then
+  for _, d := range subdirs {
+    if subcms := WalkGenPath(filepath.Join(cms.path, d.Name())); subcms != nil {
+      cms.subdirs = append(cms.subdirs, subcms)
+    }
+  }
+ 
+  cms.CleanOut()
+  return &cms
+}
+
+// Generate an Out file from Src file
+func (cms *CMS) generate(src string) {
+  
+}
+
+// Copy as is a Src file to an Out file
+func (cms *CMS) copy(src string) {
+  fsrc := filepath.Join(cms.GetSrcDir(), src)
+  fdst := filepath.Join(cms.GetOutDir(), src)
+  
+  inf, err := os.Open(fsrc)
+  if err != nil {
+    ERROR(err.Error())
+    return
+  }
+  defer inf.Close()
+  
+  ouf, err := os.Create(fdst)
+  if err != nil {
+    ERROR(err.Error())
+    return
+  }
+  defer ouf.Close()
+  
+  _, err = io.Copy(ouf, inf)
+  if err != nil {
+    ERROR(err.Error())
+    return
+  }
+  cms.legit(src)
+}
+
+// Mark a file in Out as legit from Src, by deleting it from outfiles
+func (cms *CMS) legit(src string) {
+  nf := []os.FileInfo{}
+  for _, f := range cms.outfiles {
+    if f.Name() != src {
+      nf = append(nf, f)
+    }
+  }
+  cms.outfiles = nf
+}
+
+// Cleanup: delete any extra files in Pub not present in Post
+func (cms *CMS) CleanOut() {
+  for _, f := range cms.outfiles {
+    DEBUG("Going to delete %v", f.Name())
+  }
+  cms.path = ""
+  cms.outfiles = nil
+}
+ 
+// Populate pubContent from a PostsDir's sub dir
+func (cms *CMS) PopulateOut() {
+  outDir := cms.GetOutDir()
+  DEBUG("populating %v", outDir)
+
+  os.MkdirAll(outDir, 0755)
+  files, err := ioutil.ReadDir(outDir)
+  if err != nil {
+    WARN(err.Error())
+    return
+  }
+  for _, f := range files {
+    if ! f.IsDir() {
+      cms.outfiles = append(cms.outfiles, f)
+    }
+  }
+}
+
 // Clear the public directory, ignoring special files, subdirectories, and hidden (dot) files.
 func clearPublicDir() error {
   // do nothing for now
@@ -91,13 +201,6 @@ func clearPublicDir() error {
 	}
 	for _, fi := range fis {
 		if !fi.IsDir() && !strings.HasPrefix(fi.Name(), ".") {
-			// Check for special files
-			if _, ok := specFiles[fi.Name()]; !ok {
-				err = os.Remove(filepath.Join(PublicDir, fi.Name()))
-				if err != nil {
-					return fmt.Errorf("error deleting file %s: %s", fi.Name(), err)
-				}
-			}
 		}
 	}
 	return nil
@@ -132,13 +235,13 @@ func generateSite() error {
 	if err := compileTemplates(); err != nil {
 		return err
 	}
+  genPath(PostsDir)
+  return nil
 	// Now read the posts
 	fis, err := ioutil.ReadDir(PostsDir)
 	if err != nil {
 		return err
 	}
-	// Remove directories from the list, keep only .md files
-	fis = filter(fis)
 	// Get all posts.
 	all, recent := getPosts(fis)
 	// Delete current public directory files
@@ -211,3 +314,4 @@ func generateFile(td *PostData, idx bool) error {
 	}
 	return tpl.ExecuteTemplate(w, tplName+".amber", td)
 }
+
