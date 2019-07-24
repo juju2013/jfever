@@ -16,11 +16,19 @@ import (
 	"github.com/juju2013/amber"
 )
 
+// Site data
+type Site struct {
+  RootCMS     *CMS            // root CMS
+  Navigation  string          // navigation HTML
+}
+
 // Content Management Struct
 type CMS struct {
   path        string          // part of path relatif to SRC and OUT
+  name        string          // navigation name
   outfiles    []os.FileInfo   // (extra) files in Out
-  subdirs     []*CMS            // subdirectories
+  srcfiles    []os.FileInfo   // Source files
+  subdirs     []*CMS          // subdirectories
 }
 
 // return the full Out path
@@ -37,7 +45,7 @@ var (
 	//postTpl   *template.Template // The one and only compiled post template
 	postTpls  map[string]*template.Template // [templateName]=*compiledTemplate
 	postTplNm = "post.amber"                // The amber post template file name (native Go are compiled using ParseGlob)
-  rootCMS     *CMS
+  site      = Site{}
 
 	funcs = template.FuncMap{
 		"fmttime": func(t time.Time, f string) string {
@@ -75,16 +83,16 @@ func compileTemplates() (err error) {
 
 // scan a directory tree and generate outputs
 func genPath(dir string) {
-  rootCMS = WalkGenPath(".")
+  site.RootCMS = CMSTree(".")
+  site.BuildNavigation()
+  site.RootCMS.BuildTree()
 }
 
-// Walk traverse a directory tree and generate outputs
-func WalkGenPath(dir string) *CMS {
-  DEBUG("Processing %v", dir)
+// Build a CMS tree from SRC directory tree
+func CMSTree(dir string) *CMS {
+  DEBUG("Scanning %v", dir)
   
-  cms := CMS{path: dir}
-  cms.PopulateOut()
-  subdirs := []os.FileInfo{}
+  cms := CMS{path: dir, name: filepath.Base(dir)}
   
   files, err := ioutil.ReadDir(cms.GetSrcDir())
   if err != nil {
@@ -94,30 +102,61 @@ func WalkGenPath(dir string) *CMS {
   // walk all files first
   for _, fi := range files {
     if fi.IsDir() {
-      subdirs = append(subdirs, fi)
+      if subcms := CMSTree(filepath.Join(cms.path, fi.Name())); subcms != nil {
+        cms.subdirs = append(cms.subdirs, subcms)
+      }
     } else {
-      fname := fi.Name()
-      DEBUG("\t... file %v\n", fname)
-      if strings.HasPrefix(fi.Name(), ".") {
-        continue
-      }
-      if matched, _ := regexp.MatchString(".*\\.md", fname); matched {
-        cms.generate(fname)
-      } else {
-        cms.copy(fname)
-      }
+      cms.srcfiles = append(cms.srcfiles, fi)
     }
   }
   
-  // walk subdir then
-  for _, d := range subdirs {
-    if subcms := WalkGenPath(filepath.Join(cms.path, d.Name())); subcms != nil {
-      cms.subdirs = append(cms.subdirs, subcms)
+  return &cms
+}
+
+// Build a simple navigation tree with ul/li
+func (site *Site) BuildNavigation() {
+  var f func(*CMS) string
+  f = func(cms *CMS) string {
+    html:=""
+    for _, scms := range cms.subdirs {
+      html+=" <li>"+scms.name+"</li> "
+      html+=f(scms)
+    }
+    if len(html)>0 {
+      html="  <ul>"+html+"</ul>  "
+    }
+    return html
+  }
+  site.Navigation = f(site.RootCMS)
+  DEBUG("**********NAVIGATION=\n%v", site.Navigation)
+}
+
+// Build the site from CMS
+func (cms *CMS) BuildTree() {
+  DEBUG("Building %v", cms.path)
+  
+  // build all pages for current directory
+  cms.PopulateOut()
+  for _, fi := range cms.srcfiles {
+    fname := fi.Name()
+    DEBUG("\t... file %v\n", fname)
+    if strings.HasPrefix(fi.Name(), ".") {
+      continue
+    }
+    if matched, _ := regexp.MatchString(".*\\.md", fname); matched {
+      cms.generate(fname)
+    } else {
+      cms.copy(fname)
     }
   }
- 
+  
+  // build sub-directories
+  for _, fi := range cms.subdirs {
+    fi.BuildTree()
+  }
+
+  // clean up 
   cms.CleanOut()
-  return &cms
 }
 
 // Generate an Out file from Src file
