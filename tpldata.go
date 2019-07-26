@@ -134,9 +134,9 @@ func readFrontMatter(s *bufio.Scanner) (TemplateData, error) {
 	return nil, ErrEmptyPost
 }
 
-// Create a Post from the specified FileInfo.
-func newPost(fi os.FileInfo) (*PostData, error) {
-	f, err := os.Open(filepath.Join(PostsDir, fi.Name()))
+// Generate an Out file from Src file
+func (cms *CMS) genContent(mdf string) (*PostData, error) {
+	f, err := os.Open(filepath.Join(cms.GetSrcDir(), mdf))
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,8 @@ func newPost(fi os.FileInfo) (*PostData, error) {
 		return nil, err
 	}
 
-	slug := getSlug(fi.Name())
+	slug := getSlug(mdf)
+  fi, _ := f.Stat()
 	pubdt := fi.ModTime()
 	if dt, ok := td["Date"]; ok && len(dt) > 0 {
 		pubdt, err = time.Parse(pubDtFmt[len(dt)], dt)

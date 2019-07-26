@@ -5,11 +5,11 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	"net/url"
+	_ "net/url"
 	"os"
 	"path/filepath"
   "regexp"
-	"sort"
+	_ "sort"
 	"strings"
 	"time"
 
@@ -51,6 +51,9 @@ var (
 		"fmttime": func(t time.Time, f string) string {
 			return t.Format(f)
 		},
+    "navmenu": func() string {
+      return NavigationMenu()
+    },
 	}
 )
 
@@ -70,14 +73,16 @@ func (s sortablePosts) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 // Compile the tempalte directory
 func compileTemplates() (err error) {
 	var exists bool
-	postTpls, err = amber.CompileDir(TemplatesDir, amber.DefaultDirOptions, amber.DefaultOptions)
+	tmptpl, err := amber.CompileDir(TemplatesDir, amber.DefaultDirOptions, amber.DefaultOptions)
 	if err != nil {
 		return
 	}
+  postTpls = tmptpl
 	postTplNm = "post"
 	if _, exists = postTpls[postTplNm]; !exists {
 		return fmt.Errorf("error parsing templates: %v", err)
 	}
+  DEBUG("Directory compiled: %v", TemplatesDir)
 	return nil
 }
 
@@ -90,7 +95,6 @@ func genPath(dir string) {
 
 // Build a CMS tree from SRC directory tree
 func CMSTree(dir string) *CMS {
-  DEBUG("Scanning %v", dir)
   
   cms := CMS{path: dir, name: filepath.Base(dir)}
   
@@ -113,6 +117,12 @@ func CMSTree(dir string) *CMS {
   return &cms
 }
 
+// from template
+func NavigationMenu() string {
+  site.BuildNavigation()
+  return site.Navigation
+}
+
 // Build a simple navigation tree with ul/li
 func (site *Site) BuildNavigation() {
   var f func(*CMS) string
@@ -128,18 +138,15 @@ func (site *Site) BuildNavigation() {
     return html
   }
   site.Navigation = f(site.RootCMS)
-  DEBUG("**********NAVIGATION=\n%v", site.Navigation)
 }
 
 // Build the site from CMS
 func (cms *CMS) BuildTree() {
-  DEBUG("Building %v", cms.path)
   
   // build all pages for current directory
   cms.PopulateOut()
   for _, fi := range cms.srcfiles {
     fname := fi.Name()
-    DEBUG("\t... file %v\n", fname)
     if strings.HasPrefix(fi.Name(), ".") {
       continue
     }
@@ -157,11 +164,6 @@ func (cms *CMS) BuildTree() {
 
   // clean up 
   cms.CleanOut()
-}
-
-// Generate an Out file from Src file
-func (cms *CMS) generate(src string) {
-  
 }
 
 // Copy as is a Src file to an Out file
@@ -205,7 +207,7 @@ func (cms *CMS) legit(src string) {
 // Cleanup: delete any extra files in Pub not present in Post
 func (cms *CMS) CleanOut() {
   for _, f := range cms.outfiles {
-    DEBUG("Going to delete %v", f.Name())
+    os.Remove(filepath.Join(cms.GetOutDir(), f.Name()))
   }
   cms.path = ""
   cms.outfiles = nil
@@ -214,7 +216,6 @@ func (cms *CMS) CleanOut() {
 // Populate pubContent from a PostsDir's sub dir
 func (cms *CMS) PopulateOut() {
   outDir := cms.GetOutDir()
-  DEBUG("populating %v", outDir)
 
   os.MkdirAll(outDir, 0755)
   files, err := ioutil.ReadDir(outDir)
@@ -245,6 +246,7 @@ func clearPublicDir() error {
 	return nil
 }
 
+/*
 func getPosts(fis []os.FileInfo) (all, recent []*PostData) {
 	all = make([]*PostData, 0, len(fis))
 	for _, fi := range fis {
@@ -267,37 +269,19 @@ func getPosts(fis []os.FileInfo) (all, recent []*PostData) {
 	recent = all[:cnt]
 	return
 }
-
+*/
 // Generate the whole site.
 func generateSite() error {
 	// First compile the template(s)
 	if err := compileTemplates(); err != nil {
+    DEBUG("template error")
 		return err
 	}
   genPath(PostsDir)
   return nil
-	// Now read the posts
-	fis, err := ioutil.ReadDir(PostsDir)
-	if err != nil {
-		return err
-	}
-	// Get all posts.
-	all, recent := getPosts(fis)
-	// Delete current public directory files
-	if err := clearPublicDir(); err != nil {
-		return err
-	}
-	// Generate the static files
-	index := siteIndex(all)
-	for i, p := range all {
-		if err := generateFile(p, i == index); err != nil {
-			fmt.Printf("DEBUG: template %v genration failed (%v)\n", p.D["Slug"], err)
-		}
-	}
-	// Generate the RSS feed
-	return generateRss(recent)
 }
 
+/*
 // Creates the rss feed from the recent posts.
 func generateRss(td []*PostData) error {
 	r := NewRss(Options.SiteName, Options.TagLine, Options.BaseURL)
@@ -320,37 +304,51 @@ func generateRss(td []*PostData) error {
 	}
 	return r.WriteToFile(filepath.Join(PublicDir, "rss"))
 }
+*/
+
+func (cms *CMS) generate(mdf string) {
+  if data, err := cms.genContent(mdf); err == nil {
+    cms.generateFile(data, false)
+  }
+}
+
 
 // Generate the static HTML file for the post identified by the index.
-func generateFile(td *PostData, idx bool) error {
+func (cms *CMS) generateFile(td *PostData, idx bool) {
 	var w io.Writer
 
 	// check if template exists
-	tplName := td.D["Template"]
+	tplName, ok := td.D["Template"]
+  if ! ok {
+    tplName="default"
+  }
 	var tpl *template.Template
 	var ex bool
 
 	if tpl, ex = postTpls[tplName]; !ex {
-		return fmt.Errorf("Template not found: %s", tplName)
+		ERROR("Template not found: %s", tplName)
+    return
 	}
-	slug := td.D["Slug"]
-	fw, err := os.Create(filepath.Join(PublicDir, slug))
 
+	slug := td.D["Slug"]
+	fw, err := os.Create(filepath.Join(cms.GetOutDir(), slug))
 	if err != nil {
-		return fmt.Errorf("error creating static file %s: %s", slug, err)
+		ERROR("error creating static file %s: %s", slug, err)
+    return
 	}
 	defer fw.Close()
 
 	// If this is the newest file, also save as index.html
 	w = fw
 	if idx {
-		idxw, err := os.Create(filepath.Join(PublicDir, "index.html"))
+		idxw, err := os.Create(filepath.Join(cms.GetOutDir(), "index.html"))
 		if err != nil {
-			return fmt.Errorf("error creating static file index.html: %s", err)
+			ERROR("error creating static file index.html: %s", err)
+      return
 		}
 		defer idxw.Close()
 		w = io.MultiWriter(fw, idxw)
 	}
-	return tpl.ExecuteTemplate(w, tplName+".amber", td)
+	tpl.ExecuteTemplate(w, tplName+".amber", td)
+  cms.legit(slug)
 }
-
