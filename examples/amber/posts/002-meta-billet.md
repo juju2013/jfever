@@ -4,6 +4,7 @@ Title: Méta-billet: un mot sur le Calepin!
 Author: Martin Angers
 Category: technologie
 Description: Il existe de nombreux moteurs de blogue gratuits sur internet. Pourquoi avoir jeté l'ancre sur ce discret et modeste Calepin?
+Index: peut-être que oui
 ---
 
 Il existe de nombreux moteurs de blogue gratuits sur internet, tels [Wordpress][wp], [Blogger][] et [Tumblr][]. Pourquoi avoir jeté l'ancre sur ce discret et modeste [Calepin][]? Peut-être un peu pour ça, tiens, pour me tenir loin des tumultes de ces méga-centres urbains du Web. Un peu aussi pour ce *design* minimaliste, centré sur le contenu, sur les mots. Et un peu pour deux qualités franchement moins romantiques: *dropbox* et *markdown*.
