@@ -5,15 +5,13 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
-	_ "net/url"
 	"os"
 	"path/filepath"
   "regexp"
-	_ "sort"
 	"strings"
 	"time"
 
-	"github.com/juju2013/amber"
+	"git.universelle.science/juju/amber"
 )
 
 // Site data
