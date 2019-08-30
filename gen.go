@@ -1,46 +1,66 @@
 package main
 
 import (
+  "bytes"
 	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
+	"bufio"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+  "sort"
 	"time"
 
 	"git.universelle.science/juju/amber"
 )
 
-// Site data
-type Site struct {
-	RootCMS    *CMS   // root CMS
-	Navigation string // navigation HTML
-}
-
-// Content Management Struct
-type CMS struct {
+// Site structure : FOLDER
+type FOLDER struct {
 	path     string        // part of path relatif to SRC and OUT
 	name     string        // navigation name
 	outfiles []os.FileInfo // (extra) files in Out
 	srcfiles []os.FileInfo // Source files
 
 	// Navigation links
-	subdirs  []*CMS // subdirectories
-	Previous *CMS
-	Next     *CMS
-	Up       *CMS
+	subdirs  []*FOLDER    // subdirectories
+  pages    PAGES        // pages in this folder
+  index     *PAGE       // index page
+}
+
+// Site structure : Page
+type PAGE struct {
+  Folder    *FOLDER     // contening folder
+  srcName   string      // source .md file name
+  dstName   string      // destination (slug) name
+
+	PubTime time.Time
+	ModTime time.Time
+	Prev    *PAGE
+	Next    *PAGE
+  Up      *PAGE
+  
+	Meta    TemplateData
+	Content template.HTML
+  buf     *bytes.Buffer
+}
+type PAGES []*PAGE
+
+// Site data
+type Site struct {
+	RootFOLDER    *FOLDER   // root FOLDER
+	Navigation    string // navigation HTML
 }
 
 // return the full Out path
-func (cms *CMS) GetOutDir() string {
+func (cms *FOLDER) GetOutDir() string {
 	return filepath.Join(PublicDir, cms.path)
 }
 
 // return the full Src path
-func (cms *CMS) GetSrcDir() string {
+func (cms *FOLDER) GetSrcDir() string {
 	return filepath.Join(PostsDir, cms.path)
 }
 
@@ -66,12 +86,10 @@ func init() {
 	amber.AddFuncs(funcs)
 }
 
-// This type is a slice of *LongPost that implements the sort.Interface, to sort in PubTime order.
-type sortablePosts []*PostData
-
-func (s sortablePosts) Len() int           { return len(s) }
-func (s sortablePosts) Less(i, j int) bool { return s[i].PubTime.Before(s[j].PubTime) }
-func (s sortablePosts) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+// Sort pages in same folder
+func (p PAGES) Less(i, j int) bool { return p[i].PubTime.Before(p[j].PubTime) }
+func (p PAGES) Len() int           { return len(p) }
+func (p PAGES) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Compile the tempalte directory
 func compileTemplates() (err error) {
@@ -91,17 +109,17 @@ func compileTemplates() (err error) {
 
 // scan a directory tree and generate outputs
 func genPath(dir string) {
-	site.RootCMS = CMSTree(".")
+	site.RootFOLDER = FOLDERTree(".")
 	site.BuildNavigation()
-	site.RootCMS.BuildTree()
+	site.RootFOLDER.BuildTree()
 }
 
-// Build a CMS tree from SRC directory tree
-func CMSTree(dir string) *CMS {
+// Build a FOLDER tree from SRC directory tree
+func FOLDERTree(dir string) *FOLDER {
 
-	cms := CMS{path: dir, name: filepath.Base(dir)}
+	folder := FOLDER{path: dir, name: filepath.Base(dir)}
 
-	files, err := ioutil.ReadDir(cms.GetSrcDir())
+	files, err := ioutil.ReadDir(folder.GetSrcDir())
 	if err != nil {
 		WARN(err.Error())
 		return nil
@@ -109,27 +127,29 @@ func CMSTree(dir string) *CMS {
 	// walk all files first
 	for _, fi := range files {
 		if fi.IsDir() {
-			if subcms := CMSTree(filepath.Join(cms.path, fi.Name())); subcms != nil {
-				cms.subdirs = append(cms.subdirs, subcms)
+			if subfolder := FOLDERTree(filepath.Join(folder.path, fi.Name())); subfolder != nil {
+				folder.subdirs = append(folder.subdirs, subfolder)
 			}
 		} else {
-			cms.srcfiles = append(cms.srcfiles, fi)
+			folder.srcfiles = append(folder.srcfiles, fi)
 		}
 	}
 
-	return &cms
+	return &folder
 }
 
+// XXX :  DEPRECIATED, TO BE DELETED
 // from template
 func NavigationMenu() string {
 	site.BuildNavigation()
 	return site.Navigation
 }
 
+// XXX :  DEPRECIATED, TO BE DELETED
 // Build a simple navigation tree with ul/li
 func (site *Site) BuildNavigation() {
-	var f func(*CMS) string
-	f = func(cms *CMS) string {
+	var f func(*FOLDER) string
+	f = func(cms *FOLDER) string {
 		html := ""
 		for _, scms := range cms.subdirs {
 			html += " <li>" + scms.name + "</li> "
@@ -140,37 +160,41 @@ func (site *Site) BuildNavigation() {
 		}
 		return html
 	}
-	site.Navigation = f(site.RootCMS)
+	site.Navigation = f(site.RootFOLDER)
 }
 
-// Build the site from CMS
-func (cms *CMS) BuildTree() {
+// Build the site from FOLDER
+func (folder *FOLDER) BuildTree() {
 
 	// build all pages for current directory
-	cms.PopulateOut()
-	for _, fi := range cms.srcfiles {
+	folder.PopulateOut()
+	for _, fi := range folder.srcfiles {
 		fname := fi.Name()
 		if strings.HasPrefix(fi.Name(), ".") {
+      // ignore hidden files
 			continue
 		}
 		if matched, _ := regexp.MatchString(".*\\.md", fname); matched {
-			cms.generate(fname)
+			folder.newPage(fname)
 		} else {
-			cms.copy(fname)
+			folder.copy(fname)
 		}
 	}
 
+  // build all pages of current folder
+  sort.Sort(PAGES(folder.pages))
+
 	// build sub-directories
-	for _, fi := range cms.subdirs {
+	for _, fi := range folder.subdirs {
 		fi.BuildTree()
 	}
 
 	// clean up
-	cms.CleanOut()
+	folder.CleanOut()
 }
 
 // Copy as is a Src file to an Out file
-func (cms *CMS) copy(src string) {
+func (cms *FOLDER) copy(src string) {
 	fsrc := filepath.Join(cms.GetSrcDir(), src)
 	fdst := filepath.Join(cms.GetOutDir(), src)
 
@@ -197,7 +221,7 @@ func (cms *CMS) copy(src string) {
 }
 
 // Mark a file in Out as legit from Src, by deleting it from outfiles
-func (cms *CMS) legit(src string) {
+func (cms *FOLDER) legit(src string) {
 	nf := []os.FileInfo{}
 	for _, f := range cms.outfiles {
 		if f.Name() != src {
@@ -208,7 +232,7 @@ func (cms *CMS) legit(src string) {
 }
 
 // Cleanup: delete any extra files in Pub not present in Post
-func (cms *CMS) CleanOut() {
+func (cms *FOLDER) CleanOut() {
 	for _, f := range cms.outfiles {
 		os.Remove(filepath.Join(cms.GetOutDir(), f.Name()))
 	}
@@ -217,7 +241,7 @@ func (cms *CMS) CleanOut() {
 }
 
 // Populate pubContent from a PostsDir's sub dir
-func (cms *CMS) PopulateOut() {
+func (cms *FOLDER) PopulateOut() {
 	outDir := cms.GetOutDir()
 
 	os.MkdirAll(outDir, 0755)
@@ -249,30 +273,6 @@ func clearPublicDir() error {
 	return nil
 }
 
-/*
-func getPosts(fis []os.FileInfo) (all, recent []*PostData) {
-	all = make([]*PostData, 0, len(fis))
-	for _, fi := range fis {
-    DEBUG("Generating %v...", fi.Name())
-		lp, err := newPost(fi)
-		if err == nil {
-			all = append(all, lp)
-		} else {
-			WARN("post ignored: %s; error: %s\n", fi.Name(), err)
-		}
-	}
-
-	// Then sort in reverse order (newer first)
-	sort.Sort(sort.Reverse(sortablePosts(all)))
-	cnt := Options.RecentPostsCount
-	if l := len(all); l < cnt {
-		cnt = l
-	}
-	// Slice to get only recent posts
-	recent = all[:cnt]
-	return
-}
-*/
 // Generate the whole site.
 func generateSite() error {
 	// First compile the template(s)
@@ -309,14 +309,60 @@ func generateRss(td []*PostData) error {
 }
 */
 
-func (cms *CMS) generate(mdf string) {
-	if data, err := cms.genContent(mdf); err == nil {
-		cms.generateFile(data, false)
+// create newpage, fill with metadata, but don't render template yet
+func (folder *FOLDER) newPage(mdf string) {
+  var p PAGE = PAGE{
+    Folder:folder,
+    srcName:mdf,
+  }
+
+  fpath := filepath.Join(folder.GetSrcDir(), mdf)
+	f, err := os.Open(fpath)
+	if err != nil {
+    ERROR("Cannot open %v(%v)", fpath, err)
+		return
 	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	p.Meta, err = readFrontMatter(s)
+	if err != nil {
+    WARN("Cannot read meta from %v(%v)", fpath, err)
+		return
+	}
+
+	p.dstName = getSlug(mdf)
+	fi, _ := f.Stat()
+	p.PubTime = fi.ModTime()
+	p.ModTime = fi.ModTime()
+	if dt, ok := p.Meta["Date"]; ok && len(dt) > 0 {
+		pubdt, err := time.Parse(pubDtFmt[len(dt)], dt)
+		if err == nil {
+      p.PubTime = pubdt
+		}
+	}
+
+	p.Meta["Slug"] = p.dstName
+	p.Meta["PubTime"] = p.PubTime.Format("2006-01-02")
+	p.Meta["ModTime"] = p.ModTime.Format("15:04")
+  if _, ok := p.Meta["Index"]; ok {
+    folder.index = &p
+  }
+
+	// Read rest of file
+	p.buf = bytes.NewBuffer(nil)
+	for s.Scan() {
+		p.buf.WriteString(s.Text() + "\n")
+	}
+/*
+	res := blackfriday.Markdown(buf.Bytes(), bfRender, bfExtensions)
+	lp.Content = template.HTML(res)
+	return &lp, nil
+*/
+  folder.pages = append(folder.pages, &p)
 }
 
 // Generate the static HTML file for the post identified by the index.
-func (cms *CMS) generateFile(td *PostData, idx bool) {
+func (cms *FOLDER) generateFile(td *PostData, idx bool) {
 	var w io.Writer
 
 	// check if template exists

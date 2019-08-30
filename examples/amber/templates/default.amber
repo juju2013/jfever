@@ -1,10 +1,7 @@
 extends base
 
 block content
-  div.navimo
-    #{unescaped(navmenu())}
-
-
-  article
-    #{fmttime(PubTime, "2006-01-02")}
-    #{Content}
+  div
+    article
+      #{fmttime(PubTime, "2006-01-02")}
+      #{Content}

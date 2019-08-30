@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
-	"bytes"
+	_ "bytes"
+	_ "os"
 	"fmt"
 	"html/template"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -41,7 +41,6 @@ type TemplateData map[string]string
 type PostData struct {
 	PubTime time.Time
 	ModTime time.Time
-	Recent  []*PostData
 	Prev    *PostData
 	Next    *PostData
 	D       TemplateData
@@ -134,48 +133,3 @@ func readFrontMatter(s *bufio.Scanner) (TemplateData, error) {
 	return nil, ErrEmptyPost
 }
 
-// Generate an Out file from Src file
-func (cms *CMS) genContent(mdf string) (*PostData, error) {
-	f, err := os.Open(filepath.Join(cms.GetSrcDir(), mdf))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	s := bufio.NewScanner(f)
-	td, err := readFrontMatter(s)
-	if err != nil {
-		return nil, err
-	}
-
-	slug := getSlug(mdf)
-	fi, _ := f.Stat()
-	pubdt := fi.ModTime()
-	if dt, ok := td["Date"]; ok && len(dt) > 0 {
-		pubdt, err = time.Parse(pubDtFmt[len(dt)], dt)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	lp := PostData{
-		D: td,
-	}
-
-	td["Slug"] = slug
-	td["PubTime"] = pubdt.Format("2006-01-02")
-	lp.PubTime = pubdt
-	lp.ModTime = fi.ModTime()
-	td["ModTime"] = lp.ModTime.Format("15:04")
-
-	// Read rest of file
-	buf := bytes.NewBuffer(nil)
-	for s.Scan() {
-		buf.WriteString(s.Text() + "\n")
-	}
-	if err = s.Err(); err != nil {
-		return nil, err
-	}
-	res := blackfriday.Markdown(buf.Bytes(), bfRender, bfExtensions)
-	lp.Content = template.HTML(res)
-	return &lp, nil
-}
