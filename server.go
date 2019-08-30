@@ -37,4 +37,3 @@ func run() {
 		FATAL(err.Error())
 	}
 }
-

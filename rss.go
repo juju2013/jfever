@@ -57,7 +57,7 @@ type Item struct {
 func NewRss(title string, description string, link string) *Rss {
 	rss := &Rss{Version: "2.0",
 		Channels: []*Channel{
-			&Channel{
+			{
 				Title:       title,
 				Description: description,
 				Link:        link,

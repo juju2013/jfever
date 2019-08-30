@@ -148,7 +148,7 @@ func (cms *CMS) genContent(mdf string) (*PostData, error) {
 	}
 
 	slug := getSlug(mdf)
-  fi, _ := f.Stat()
+	fi, _ := f.Stat()
 	pubdt := fi.ModTime()
 	if dt, ok := td["Date"]; ok && len(dt) > 0 {
 		pubdt, err = time.Parse(pubDtFmt[len(dt)], dt)
