@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"git.universelle.science/juju/amber"
+	"github.com/russross/blackfriday"
 )
 
 // Site structure : FOLDER
@@ -181,7 +182,7 @@ func (folder *FOLDER) BuildTree() {
 		}
 	}
 
-  // build all pages of current folder
+  // read metadata for all pages of current folder
   sort.Sort(PAGES(folder.pages))
 
 	// build sub-directories
@@ -189,6 +190,11 @@ func (folder *FOLDER) BuildTree() {
 		fi.BuildTree()
 	}
 
+  // buil all page for current folder
+  for _, pa := range folder.pages {
+    folder.generateFile(pa, pa == folder.index)
+  }
+  
 	// clean up
 	folder.CleanOut()
 }
@@ -284,31 +290,6 @@ func generateSite() error {
 	return nil
 }
 
-/*
-// Creates the rss feed from the recent posts.
-func generateRss(td []*PostData) error {
-	r := NewRss(Options.SiteName, Options.TagLine, Options.BaseURL)
-	base, err := url.Parse(Options.BaseURL)
-	if err != nil {
-		return fmt.Errorf("error parsing base URL: %s", err)
-	}
-	for _, p := range td {
-		u, err := base.Parse((p.D["Slug"]))
-		if err != nil {
-			return fmt.Errorf("error parsing post URL: %s", err)
-		}
-		r.Channels[0].AppendItem(NewRssItem(
-			p.D["Title"],
-			u.String(),
-			p.D["Description"],
-			p.D["Author"],
-			"",
-			p.PubTime))
-	}
-	return r.WriteToFile(filepath.Join(PublicDir, "rss"))
-}
-*/
-
 // create newpage, fill with metadata, but don't render template yet
 func (folder *FOLDER) newPage(mdf string) {
   var p PAGE = PAGE{
@@ -353,20 +334,16 @@ func (folder *FOLDER) newPage(mdf string) {
 	for s.Scan() {
 		p.buf.WriteString(s.Text() + "\n")
 	}
-/*
-	res := blackfriday.Markdown(buf.Bytes(), bfRender, bfExtensions)
-	lp.Content = template.HTML(res)
-	return &lp, nil
-*/
   folder.pages = append(folder.pages, &p)
 }
 
 // Generate the static HTML file for the post identified by the index.
-func (cms *FOLDER) generateFile(td *PostData, idx bool) {
+func (cms *FOLDER) generateFile(p *PAGE, idx bool) {
 	var w io.Writer
 
+  INFO("building page:%v %v", cms.path, p.dstName)
 	// check if template exists
-	tplName, ok := td.D["Template"]
+	tplName, ok := p.Meta["Template"]
 	if !ok {
 		tplName = "default"
 	}
@@ -378,10 +355,10 @@ func (cms *FOLDER) generateFile(td *PostData, idx bool) {
 		return
 	}
 
-	slug := td.D["Slug"]
+	slug := p.Meta["Slug"]
 	fw, err := os.Create(filepath.Join(cms.GetOutDir(), slug))
 	if err != nil {
-		ERROR("error creating static file %s: %s", slug, err)
+		ERROR("error creating output %s: %s", slug, err)
 		return
 	}
 	defer fw.Close()
@@ -397,6 +374,11 @@ func (cms *FOLDER) generateFile(td *PostData, idx bool) {
 		defer idxw.Close()
 		w = io.MultiWriter(fw, idxw)
 	}
-	tpl.ExecuteTemplate(w, tplName+".amber", td)
+
+  // format from mardown
+	res := blackfriday.Markdown(p.buf.Bytes(), bfRender, bfExtensions)
+	p.Content = template.HTML(res)
+
+	tpl.ExecuteTemplate(w, tplName+".amber", p)
 	cms.legit(slug)
 }

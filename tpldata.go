@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	_ "bytes"
-	_ "os"
 	"fmt"
 	"html/template"
+	_ "os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -132,4 +132,3 @@ func readFrontMatter(s *bufio.Scanner) (TemplateData, error) {
 	}
 	return nil, ErrEmptyPost
 }
-

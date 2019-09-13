@@ -1,5 +1,10 @@
 !!! html
 // From HTML5 Boilerplate
+
+html
+  div
+    #{Content}
+    
 html.no-js[lang=D.Lang]
 	head
 		block meta
@@ -23,9 +28,9 @@ html.no-js[lang=D.Lang]
 		block header
 			div.header
 				div.title
-					a[href="/"] #{D.SiteName}
+					a[href="/"] #{Meta.SiteName}
 					br
-					span.tagline #{D.TagLine}
+					span.tagline #{Meta.TagLine}
 
 		nav#nav
 			block navigation
