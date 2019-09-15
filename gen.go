@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -20,15 +21,17 @@ import (
 
 // Site structure : FOLDER
 type FOLDER struct {
-	Path     string        // part of path relatif to SRC and OUT
-	Name     string        // navigation name
-	outfiles []os.FileInfo // (extra) files in Out
-	srcfiles []os.FileInfo // Source files
+  Site      *Site
+	Path      string        // part of path relatif to SRC and OUT
+	Name      string        // navigation name
+	outfiles  []os.FileInfo // (extra) files in Out
+	srcfiles  []os.FileInfo // Source files
 
-	// Navigation links
+	// SiteMap links
 	Subdirs []*FOLDER // subdirectories
 	Pages   PAGES     // pages in this folder
 	index   *PAGE     // index page
+ 
 }
 
 // Site structure : Page
@@ -50,10 +53,17 @@ type PAGE struct {
 }
 type PAGES []*PAGE
 
+// flatten SiteMap structure: topic
+type UrlEntry struct {
+  EIndent    int     // Entry indent level
+  Url       string  // URL
+  Display   string  // Display name
+}
+
 // Site data
 type Site struct {
 	RootFOLDER *FOLDER // root FOLDER
-	Navigation string  // navigation HTML
+	SiteMap []UrlEntry
 }
 
 // return the full Out path
@@ -76,9 +86,6 @@ var (
 		"fmttime": func(t time.Time, f string) string {
 			return t.Format(f)
 		},
-		"navmenu": func() string {
-			return NavigationMenu()
-		},
 	}
 )
 
@@ -86,6 +93,7 @@ func init() {
 	// Add the custom functions to Amber in the init(), since this is global
 	// (package) state in my Amber fork.
 	amber.AddFuncs(funcs)
+  
 }
 
 // Sort pages in same folder
@@ -111,15 +119,18 @@ func compileTemplates() (err error) {
 
 // scan a directory tree and generate outputs
 func genPath(dir string) {
-	site.RootFOLDER = FOLDERTree(".")
-	site.BuildNavigation()
+  // copy all static assets first
+  copyFolder(StaticDirs, PublicDir)
+
+	site.RootFOLDER = FOLDERTree("/")
 	site.RootFOLDER.BuildTree()
+	site.BuildMap()
 }
 
 // Build a FOLDER tree from SRC directory tree
 func FOLDERTree(dir string) *FOLDER {
 
-	folder := FOLDER{Path: dir, Name: filepath.Base(dir)}
+	folder := FOLDER{Site: &site, Path: dir, Name: filepath.Base(dir)}
 
 	files, err := ioutil.ReadDir(folder.GetSrcDir())
 	if err != nil {
@@ -140,29 +151,26 @@ func FOLDERTree(dir string) *FOLDER {
 	return &folder
 }
 
-// XXX :  DEPRECIATED, TO BE DELETED
-// from template
-func NavigationMenu() string {
-	site.BuildNavigation()
-	return site.Navigation
+// Build a simple navigation tree with ul/li
+func (site *Site) BuildMap() {
+  site.SiteMap = []UrlEntry{}
+  site.RootFOLDER.UrlEntries(0)
 }
 
-// XXX :  DEPRECIATED, TO BE DELETED
-// Build a simple navigation tree with ul/li
-func (site *Site) BuildNavigation() {
-	var f func(*FOLDER) string
-	f = func(folder *FOLDER) string {
-		html := ""
-		for _, sfolder := range folder.Subdirs {
-			html += " <li>" + sfolder.Name + "</li> "
-			html += f(sfolder)
-		}
-		if len(html) > 0 {
-			html = "  <ul>" + html + "</ul>  "
-		}
-		return html
+// apped TOC of current folder to flatten navigation TOC
+func (folder *FOLDER) UrlEntries(eident int) {
+
+  // add pages first
+	for _, pa := range folder.Pages {
+		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: path.Join(folder.Path , pa.DstName), Display: pa.DstName})
 	}
-	site.Navigation = f(site.RootFOLDER)
+
+	// buil all page for current folder
+	for _, fi := range folder.Subdirs {
+		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: fi.Path+"/", Display: fi.Name+"/"})
+    fi.UrlEntries(eident+1)
+	}
+
 }
 
 // Build the site from FOLDER
@@ -200,31 +208,72 @@ func (folder *FOLDER) BuildTree() {
 	folder.CleanOut()
 }
 
-// Copy as is a Src file to an Out file
+// Copy a static file in Src to Out
 func (folder *FOLDER) copy(src string) {
 	fsrc := filepath.Join(folder.GetSrcDir(), src)
 	fdst := filepath.Join(folder.GetOutDir(), src)
 
-	inf, err := os.Open(fsrc)
-	if err != nil {
-		ERROR(err.Error())
-		return
-	}
-	defer inf.Close()
-
-	ouf, err := os.Create(fdst)
-	if err != nil {
-		ERROR(err.Error())
-		return
-	}
-	defer ouf.Close()
-
-	_, err = io.Copy(ouf, inf)
+  err := copyFile(fsrc, fdst)
 	if err != nil {
 		ERROR(err.Error())
 		return
 	}
 	folder.legit(src)
+}
+
+// Copy a file from src to dst
+func copyFile(fsrc, fdst string) error{
+	inf, err := os.Open(fsrc)
+	if err != nil {
+		return err
+	}
+	defer inf.Close()
+
+	ouf, err := os.Create(fdst)
+	if err != nil {
+		return err
+	}
+	defer ouf.Close()
+
+	_, err = io.Copy(ouf, inf)
+	if err != nil {
+		return err
+	}
+  return nil
+}
+
+// Copy a folder tree
+func copyFolder(fsrc, fdst string) error{
+  // mkdir -p
+	os.MkdirAll(fdst, 0755)
+  
+  // copy file first
+	files, err := ioutil.ReadDir(fsrc)
+	if err != nil {
+		return err
+	}
+	// walk all files first
+	for _, fi := range files {
+    if !fi.IsDir() {
+      fin := fi.Name()
+      err := copyFile(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
+      if err != nil {
+        WARN(err.Error())
+      }
+    }
+	}
+
+	// walk all subfolder
+	for _, fi := range files {
+    if fi.IsDir() {
+      fin := fi.Name()
+      err := copyFolder(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
+      if err != nil {
+        WARN(err.Error())
+      }
+    }
+	}
+	return nil
 }
 
 // Mark a file in Out as legit from Src, by deleting it from outfiles
@@ -243,7 +292,6 @@ func (folder *FOLDER) CleanOut() {
 	for _, f := range folder.outfiles {
 		os.Remove(filepath.Join(folder.GetOutDir(), f.Name()))
 	}
-	folder.Path = ""
 	folder.outfiles = nil
 }
 
@@ -297,6 +345,7 @@ func (folder *FOLDER) newPage(mdf string) {
     Root:     site.RootFOLDER,
 		Folder:   folder,
 		SrcName:  mdf,
+    Meta:     make(TemplateData),
 	}
 
 	fpath := filepath.Join(folder.GetSrcDir(), mdf)
@@ -306,14 +355,10 @@ func (folder *FOLDER) newPage(mdf string) {
 		return
 	}
 	defer f.Close()
-	s := bufio.NewScanner(f)
-	p.Meta, err = readFrontMatter(s)
-	if err != nil {
-		WARN("Cannot read meta from %v(%v)", fpath, err)
-		return
-	}
 
 	p.DstName = getSlug(mdf)
+	p.Meta["Slug"] = p.DstName
+
 	fi, _ := f.Stat()
 	p.PubTime = fi.ModTime()
 	p.ModTime = fi.ModTime()
@@ -324,13 +369,23 @@ func (folder *FOLDER) newPage(mdf string) {
 		}
 	}
 
-	p.Meta["Slug"] = p.DstName
 	p.Meta["PubTime"] = p.PubTime.Format("2006-01-02")
 	p.Meta["ModTime"] = p.ModTime.Format("15:04")
+
+	s := bufio.NewScanner(f)
+	meta, err := readFrontMatter(s)
+	if err != nil {
+		WARN("Cannot read meta from %v(%v)", fpath, err)
+		return
+	}
+  for k, v := range meta {
+    p.Meta[k]=v
+  }
+  p.DstName = p.Meta["Slug"]
+
 	if _, ok := p.Meta["Index"]; ok {
 		folder.index = &p
 	}
-
 	// Read rest of file
 	p.buf = bytes.NewBuffer(nil)
 	for s.Scan() {

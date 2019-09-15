@@ -1,0 +1,25 @@
+mixin pagelink($path, $page)
+  a[href=$path + "/" +$page] #{$page}
+
+mixin folderlink($path, $name)
+  a[href=$path] #{$name}
+
+mixin buildtoc($folder)
+  ul.subfolders
+  each $subdir in $folder.Subdirs
+    li
+      +folderlink($subdir.Path, $subdir.Name)
+  ul.pages
+  each $page in $folder.Pages
+    li
+      +pagelink($page.Folder.Path, $page.DstName)
+
+block navigation
+  div#NavPath
+    p Path: #{Folder.Path}
+
+  div#toc
+    ul
+      each $entry in Root.Site.SiteMap
+        li.naventry[level=$entry.EIndent]
+          a[href=$entry.Url] #{$entry.Display}

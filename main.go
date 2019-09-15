@@ -21,6 +21,7 @@ type options struct {
 	Src              string `short:"s" long:"src" description:"the source sub-dir name" default:"src"`
 	Out              string `short:"o" long:"out" description:"the output sub-dir name" default:"out"`
 	Template         string `short:"a" long:"template" description:"the template sub-dir name" default:"templates"`
+  Static           string `short:"i" long:"static" description:"static content to be copied to Out/" default:"static"`
 }
 
 type siteMeta struct {
@@ -35,6 +36,7 @@ var (
 	PublicDir    string   // Public directory path
 	PostsDir     string   // Posts directory path
 	TemplatesDir string   // Templates directory path
+  StaticDirs   string   // Static contents path
 	RssURL       string   // The RSS feed URL, parsed only once and stored for convenience
 	SiteMeta     siteMeta // The site meta data can be used by posts
 	Debug        bool     // Enable debug output
@@ -73,6 +75,13 @@ func init() {
 		TemplatesDir = Options.Template
 	} else {
 		TemplatesDir = filepath.Join(RootDir, Options.Template)
+	}
+
+	// TemplatesDir is where templates stays
+	if Options.Static[0] == '/' {
+		StaticDirs = Options.Static
+	} else {
+		StaticDirs = filepath.Join(RootDir, Options.Static)
 	}
 
 	initBF()
