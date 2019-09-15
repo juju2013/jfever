@@ -26,13 +26,14 @@ type FOLDER struct {
 	srcfiles []os.FileInfo // Source files
 
 	// Navigation links
-	subdirs []*FOLDER // subdirectories
-	pages   PAGES     // pages in this folder
+	Subdirs []*FOLDER // subdirectories
+	Pages   PAGES     // pages in this folder
 	index   *PAGE     // index page
 }
 
 // Site structure : Page
 type PAGE struct {
+  Root    *FOLDER // shortcut to root folder
 	Folder  *FOLDER // contening folder
 	SrcName string  // source .md file name
 	DstName string  // destination (slug) name
@@ -129,7 +130,7 @@ func FOLDERTree(dir string) *FOLDER {
 	for _, fi := range files {
 		if fi.IsDir() {
 			if subfolder := FOLDERTree(filepath.Join(folder.Path, fi.Name())); subfolder != nil {
-				folder.subdirs = append(folder.subdirs, subfolder)
+				folder.Subdirs = append(folder.Subdirs, subfolder)
 			}
 		} else {
 			folder.srcfiles = append(folder.srcfiles, fi)
@@ -152,7 +153,7 @@ func (site *Site) BuildNavigation() {
 	var f func(*FOLDER) string
 	f = func(folder *FOLDER) string {
 		html := ""
-		for _, sfolder := range folder.subdirs {
+		for _, sfolder := range folder.Subdirs {
 			html += " <li>" + sfolder.Name + "</li> "
 			html += f(sfolder)
 		}
@@ -183,15 +184,15 @@ func (folder *FOLDER) BuildTree() {
 	}
 
 	// read metadata for all pages of current folder
-	sort.Sort(PAGES(folder.pages))
+	sort.Sort(PAGES(folder.Pages))
 
 	// build sub-directories
-	for _, fi := range folder.subdirs {
+	for _, fi := range folder.Subdirs {
 		fi.BuildTree()
 	}
 
 	// buil all page for current folder
-	for _, pa := range folder.pages {
+	for _, pa := range folder.Pages {
 		folder.generateFile(pa, pa == folder.index)
 	}
 
@@ -293,8 +294,9 @@ func generateSite() error {
 // create newpage, fill with metadata, but don't render template yet
 func (folder *FOLDER) newPage(mdf string) {
 	var p PAGE = PAGE{
-		Folder:  folder,
-		SrcName: mdf,
+    Root:     site.RootFOLDER,
+		Folder:   folder,
+		SrcName:  mdf,
 	}
 
 	fpath := filepath.Join(folder.GetSrcDir(), mdf)
@@ -334,14 +336,13 @@ func (folder *FOLDER) newPage(mdf string) {
 	for s.Scan() {
 		p.buf.WriteString(s.Text() + "\n")
 	}
-	folder.pages = append(folder.pages, &p)
+	folder.Pages = append(folder.Pages, &p)
 }
 
 // Generate the static HTML file for the post identified by the index.
 func (folder *FOLDER) generateFile(p *PAGE, idx bool) {
 	var w io.Writer
 
-	INFO("building page:%v %v", folder.Path, p.DstName)
 	// check if template exists
 	tplName, ok := p.Meta["Template"]
 	if !ok {
