@@ -4,3 +4,19 @@
   font-weight: 400;
   src: local('Telex Regular'), local('Telex-Regular'), url(/css/telex.ttf) format('truetype');
 }
+
+#NavPath { display: none;}
+
+#toc ul li {
+  list-style-type: none;
+}
+
+#toc ul li[level="1"] {
+  margin-left: 1.5em;
+}
+#toc ul li[level="2"] {
+  margin-left: 3em;
+}
+#toc ul li[level="3"] {
+  margin-left: 4.5em;
+}

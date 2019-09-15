@@ -122,7 +122,7 @@ func main() {
 			return
 		}
 		// Start the watcher
-		go beginWatch(TemplatesDir, PostsDir)
+		go beginWatch(TemplatesDir, PostsDir, StaticDirs)
 
 		// Start the web server
 		run()

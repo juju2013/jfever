@@ -47,7 +47,7 @@ html.no-js[lang=Meta.Lang]
             P Product of 
               a[href="https://git.inexacte.science/juju/jfever"] jfever
               | .
-        div.container.copyright
+        div.container.copyright copyright by bqlk3ud@inexacte.science 2018,2019 -, all rights reserved.
 
   block hidden
     hidden

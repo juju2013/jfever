@@ -19,6 +19,7 @@ block navigation
     p Path: #{Folder.Path}
 
   div#toc
+    p Table of Content
     ul
       each $entry in Root.Site.SiteMap
         li.naventry[level=$entry.EIndent]
