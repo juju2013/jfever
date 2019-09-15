@@ -1,17 +1,17 @@
 package main
 
 import (
-  "bytes"
+	"bufio"
+	"bytes"
 	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
-	"bufio"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
-  "sort"
 	"time"
 
 	"git.universelle.science/juju/amber"
@@ -20,49 +20,49 @@ import (
 
 // Site structure : FOLDER
 type FOLDER struct {
-	path     string        // part of path relatif to SRC and OUT
-	name     string        // navigation name
+	Path     string        // part of path relatif to SRC and OUT
+	Name     string        // navigation name
 	outfiles []os.FileInfo // (extra) files in Out
 	srcfiles []os.FileInfo // Source files
 
 	// Navigation links
-	subdirs  []*FOLDER    // subdirectories
-  pages    PAGES        // pages in this folder
-  index     *PAGE       // index page
+	subdirs []*FOLDER // subdirectories
+	pages   PAGES     // pages in this folder
+	index   *PAGE     // index page
 }
 
 // Site structure : Page
 type PAGE struct {
-  Folder    *FOLDER     // contening folder
-  srcName   string      // source .md file name
-  dstName   string      // destination (slug) name
+	Folder  *FOLDER // contening folder
+	SrcName string  // source .md file name
+	DstName string  // destination (slug) name
 
 	PubTime time.Time
 	ModTime time.Time
 	Prev    *PAGE
 	Next    *PAGE
-  Up      *PAGE
-  
+	Up      *PAGE
+
 	Meta    TemplateData
 	Content template.HTML
-  buf     *bytes.Buffer
+	buf     *bytes.Buffer
 }
 type PAGES []*PAGE
 
 // Site data
 type Site struct {
-	RootFOLDER    *FOLDER   // root FOLDER
-	Navigation    string // navigation HTML
+	RootFOLDER *FOLDER // root FOLDER
+	Navigation string  // navigation HTML
 }
 
 // return the full Out path
-func (cms *FOLDER) GetOutDir() string {
-	return filepath.Join(PublicDir, cms.path)
+func (folder *FOLDER) GetOutDir() string {
+	return filepath.Join(PublicDir, folder.Path)
 }
 
 // return the full Src path
-func (cms *FOLDER) GetSrcDir() string {
-	return filepath.Join(PostsDir, cms.path)
+func (folder *FOLDER) GetSrcDir() string {
+	return filepath.Join(PostsDir, folder.Path)
 }
 
 var (
@@ -118,7 +118,7 @@ func genPath(dir string) {
 // Build a FOLDER tree from SRC directory tree
 func FOLDERTree(dir string) *FOLDER {
 
-	folder := FOLDER{path: dir, name: filepath.Base(dir)}
+	folder := FOLDER{Path: dir, Name: filepath.Base(dir)}
 
 	files, err := ioutil.ReadDir(folder.GetSrcDir())
 	if err != nil {
@@ -128,7 +128,7 @@ func FOLDERTree(dir string) *FOLDER {
 	// walk all files first
 	for _, fi := range files {
 		if fi.IsDir() {
-			if subfolder := FOLDERTree(filepath.Join(folder.path, fi.Name())); subfolder != nil {
+			if subfolder := FOLDERTree(filepath.Join(folder.Path, fi.Name())); subfolder != nil {
 				folder.subdirs = append(folder.subdirs, subfolder)
 			}
 		} else {
@@ -150,11 +150,11 @@ func NavigationMenu() string {
 // Build a simple navigation tree with ul/li
 func (site *Site) BuildNavigation() {
 	var f func(*FOLDER) string
-	f = func(cms *FOLDER) string {
+	f = func(folder *FOLDER) string {
 		html := ""
-		for _, scms := range cms.subdirs {
-			html += " <li>" + scms.name + "</li> "
-			html += f(scms)
+		for _, sfolder := range folder.subdirs {
+			html += " <li>" + sfolder.Name + "</li> "
+			html += f(sfolder)
 		}
 		if len(html) > 0 {
 			html = "  <ul>" + html + "</ul>  "
@@ -172,7 +172,7 @@ func (folder *FOLDER) BuildTree() {
 	for _, fi := range folder.srcfiles {
 		fname := fi.Name()
 		if strings.HasPrefix(fi.Name(), ".") {
-      // ignore hidden files
+			// ignore hidden files
 			continue
 		}
 		if matched, _ := regexp.MatchString(".*\\.md", fname); matched {
@@ -182,27 +182,27 @@ func (folder *FOLDER) BuildTree() {
 		}
 	}
 
-  // read metadata for all pages of current folder
-  sort.Sort(PAGES(folder.pages))
+	// read metadata for all pages of current folder
+	sort.Sort(PAGES(folder.pages))
 
 	// build sub-directories
 	for _, fi := range folder.subdirs {
 		fi.BuildTree()
 	}
 
-  // buil all page for current folder
-  for _, pa := range folder.pages {
-    folder.generateFile(pa, pa == folder.index)
-  }
-  
+	// buil all page for current folder
+	for _, pa := range folder.pages {
+		folder.generateFile(pa, pa == folder.index)
+	}
+
 	// clean up
 	folder.CleanOut()
 }
 
 // Copy as is a Src file to an Out file
-func (cms *FOLDER) copy(src string) {
-	fsrc := filepath.Join(cms.GetSrcDir(), src)
-	fdst := filepath.Join(cms.GetOutDir(), src)
+func (folder *FOLDER) copy(src string) {
+	fsrc := filepath.Join(folder.GetSrcDir(), src)
+	fdst := filepath.Join(folder.GetOutDir(), src)
 
 	inf, err := os.Open(fsrc)
 	if err != nil {
@@ -223,32 +223,32 @@ func (cms *FOLDER) copy(src string) {
 		ERROR(err.Error())
 		return
 	}
-	cms.legit(src)
+	folder.legit(src)
 }
 
 // Mark a file in Out as legit from Src, by deleting it from outfiles
-func (cms *FOLDER) legit(src string) {
+func (folder *FOLDER) legit(src string) {
 	nf := []os.FileInfo{}
-	for _, f := range cms.outfiles {
+	for _, f := range folder.outfiles {
 		if f.Name() != src {
 			nf = append(nf, f)
 		}
 	}
-	cms.outfiles = nf
+	folder.outfiles = nf
 }
 
 // Cleanup: delete any extra files in Pub not present in Post
-func (cms *FOLDER) CleanOut() {
-	for _, f := range cms.outfiles {
-		os.Remove(filepath.Join(cms.GetOutDir(), f.Name()))
+func (folder *FOLDER) CleanOut() {
+	for _, f := range folder.outfiles {
+		os.Remove(filepath.Join(folder.GetOutDir(), f.Name()))
 	}
-	cms.path = ""
-	cms.outfiles = nil
+	folder.Path = ""
+	folder.outfiles = nil
 }
 
 // Populate pubContent from a PostsDir's sub dir
-func (cms *FOLDER) PopulateOut() {
-	outDir := cms.GetOutDir()
+func (folder *FOLDER) PopulateOut() {
+	outDir := folder.GetOutDir()
 
 	os.MkdirAll(outDir, 0755)
 	files, err := ioutil.ReadDir(outDir)
@@ -258,7 +258,7 @@ func (cms *FOLDER) PopulateOut() {
 	}
 	for _, f := range files {
 		if !f.IsDir() {
-			cms.outfiles = append(cms.outfiles, f)
+			folder.outfiles = append(folder.outfiles, f)
 		}
 	}
 }
@@ -292,56 +292,56 @@ func generateSite() error {
 
 // create newpage, fill with metadata, but don't render template yet
 func (folder *FOLDER) newPage(mdf string) {
-  var p PAGE = PAGE{
-    Folder:folder,
-    srcName:mdf,
-  }
+	var p PAGE = PAGE{
+		Folder:  folder,
+		SrcName: mdf,
+	}
 
-  fpath := filepath.Join(folder.GetSrcDir(), mdf)
+	fpath := filepath.Join(folder.GetSrcDir(), mdf)
 	f, err := os.Open(fpath)
 	if err != nil {
-    ERROR("Cannot open %v(%v)", fpath, err)
+		ERROR("Cannot open %v(%v)", fpath, err)
 		return
 	}
 	defer f.Close()
 	s := bufio.NewScanner(f)
 	p.Meta, err = readFrontMatter(s)
 	if err != nil {
-    WARN("Cannot read meta from %v(%v)", fpath, err)
+		WARN("Cannot read meta from %v(%v)", fpath, err)
 		return
 	}
 
-	p.dstName = getSlug(mdf)
+	p.DstName = getSlug(mdf)
 	fi, _ := f.Stat()
 	p.PubTime = fi.ModTime()
 	p.ModTime = fi.ModTime()
 	if dt, ok := p.Meta["Date"]; ok && len(dt) > 0 {
 		pubdt, err := time.Parse(pubDtFmt[len(dt)], dt)
 		if err == nil {
-      p.PubTime = pubdt
+			p.PubTime = pubdt
 		}
 	}
 
-	p.Meta["Slug"] = p.dstName
+	p.Meta["Slug"] = p.DstName
 	p.Meta["PubTime"] = p.PubTime.Format("2006-01-02")
 	p.Meta["ModTime"] = p.ModTime.Format("15:04")
-  if _, ok := p.Meta["Index"]; ok {
-    folder.index = &p
-  }
+	if _, ok := p.Meta["Index"]; ok {
+		folder.index = &p
+	}
 
 	// Read rest of file
 	p.buf = bytes.NewBuffer(nil)
 	for s.Scan() {
 		p.buf.WriteString(s.Text() + "\n")
 	}
-  folder.pages = append(folder.pages, &p)
+	folder.pages = append(folder.pages, &p)
 }
 
 // Generate the static HTML file for the post identified by the index.
-func (cms *FOLDER) generateFile(p *PAGE, idx bool) {
+func (folder *FOLDER) generateFile(p *PAGE, idx bool) {
 	var w io.Writer
 
-  INFO("building page:%v %v", cms.path, p.dstName)
+	INFO("building page:%v %v", folder.Path, p.DstName)
 	// check if template exists
 	tplName, ok := p.Meta["Template"]
 	if !ok {
@@ -356,7 +356,7 @@ func (cms *FOLDER) generateFile(p *PAGE, idx bool) {
 	}
 
 	slug := p.Meta["Slug"]
-	fw, err := os.Create(filepath.Join(cms.GetOutDir(), slug))
+	fw, err := os.Create(filepath.Join(folder.GetOutDir(), slug))
 	if err != nil {
 		ERROR("error creating output %s: %s", slug, err)
 		return
@@ -366,7 +366,7 @@ func (cms *FOLDER) generateFile(p *PAGE, idx bool) {
 	// If this is the newest file, also save as index.html
 	w = fw
 	if idx {
-		idxw, err := os.Create(filepath.Join(cms.GetOutDir(), "index.html"))
+		idxw, err := os.Create(filepath.Join(folder.GetOutDir(), "index.html"))
 		if err != nil {
 			ERROR("error creating static file index.html: %s", err)
 			return
@@ -375,10 +375,10 @@ func (cms *FOLDER) generateFile(p *PAGE, idx bool) {
 		w = io.MultiWriter(fw, idxw)
 	}
 
-  // format from mardown
+	// format from mardown
 	res := blackfriday.Markdown(p.buf.Bytes(), bfRender, bfExtensions)
 	p.Content = template.HTML(res)
 
 	tpl.ExecuteTemplate(w, tplName+".amber", p)
-	cms.legit(slug)
+	folder.legit(slug)
 }
