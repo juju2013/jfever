@@ -107,16 +107,11 @@ func (p PAGES) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Compile the tempalte directory
 func compileTemplates() (err error) {
-	var exists bool
 	tmptpl, err := amber.CompileDir(TemplatesDir, amber.DefaultDirOptions, amber.DefaultOptions)
 	if err != nil {
 		return
 	}
 	postTpls = tmptpl
-	postTplNm = "post"
-	if _, exists = postTpls[postTplNm]; !exists {
-		return fmt.Errorf("error parsing templates: %v", err)
-	}
 	DEBUG("Directory compiled: %v", TemplatesDir)
 	return nil
 }
@@ -336,7 +331,7 @@ func clearPublicDir() error {
 func generateSite() error {
 	// First compile the template(s)
 	if err := compileTemplates(); err != nil {
-		DEBUG("template error")
+		DEBUG("template error %v", err)
 		return err
 	}
 	genPath(PostsDir)
