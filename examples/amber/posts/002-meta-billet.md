@@ -4,7 +4,6 @@ Title: Méta-billet: un mot sur le Calepin!
 Author: Martin Angers
 Category: technologie
 Description: Il existe de nombreux moteurs de blogue gratuits sur internet. Pourquoi avoir jeté l'ancre sur ce discret et modeste Calepin?
-Index: peut-être que oui
 Template: default
 ---
 
