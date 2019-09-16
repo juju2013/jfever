@@ -39,16 +39,16 @@ html.no-js[lang=Meta.Lang]
         div.pure-g
           div.pure-u-1-3
             a[href="https://git.inexacte.science/juju"][title="My repositories"]
-              small
-                span.icon-github-circled
-                |see also my other projects
+              span.demo-icon.icon-forward
+              |see also my other projects
           div.pure-u-1-3
           div.pure-u-1-3
             P Product of 
               a[href="https://git.inexacte.science/juju/jfever"] jfever
               | .
-        div.container.copyright copyright by bqlk3ud@inexacte.science 2018,2019 -, all rights reserved.
+        div.container.copyright copyright by bqlk3ud
+          span.demo-icon.icon-at
+          |inexacte.science 2018,2019 -, all rights reserved.
 
   block hidden
     hidden
-
