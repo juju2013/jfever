@@ -18,9 +18,12 @@ block navigation
   div#NavPath
     p Path: #{Folder.Path}
 
-  div#toc
-    p Table of Content
-    ul
+  div#toc[role="navigation"]
+    Input[type="checkbox"]
+    span
+    span
+    span
+    ul#menu
       each $entry in Root.Site.SiteMap
         li.naventry[level=$entry.EIndent]
           a[href=$entry.Url] #{$entry.Display}
