@@ -77,6 +77,8 @@ Key `Template` can be used to choose the template (without the .amber extension)
 
 Key `Index` will save also the page as `index.html`, its value will be ignored.
 
+Key `Slug` will rename the page with its value, default to all characters in filename within regex `[^a-zA-Z\-_0-9]` .
+
 You can define any `xxx` key in the front matter and use that key/value in your template.
 
 ## Demo
