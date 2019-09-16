@@ -1,4 +1,8 @@
 package main
+/*
+ * This is freesofware under 2-clause BSD license, See LICENSE file
+ * Copyright (c) 2013, Martin Angers
+ */
 
 import (
 	"bytes"

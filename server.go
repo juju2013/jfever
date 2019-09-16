@@ -1,4 +1,7 @@
 package main
+/*
+ * This is freesofware under 2-clause BSD license, See LICENSE file
+ */
 
 import (
 	"fmt"
