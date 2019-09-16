@@ -1,7 +1,0 @@
-extends layout
-
-block content
-	time #{fmttime(Post.ShortPost.PubTime, "2006-01-02")}
-	article
-		| #{Post.Content}
-
