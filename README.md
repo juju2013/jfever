@@ -1,13 +1,3 @@
----
-Date: 2019-09-15
-Title: Jfever, yet another static site generator
-Author: Juju
-Category: technologie, blog, generator, golang
-Description: What this generator is about and how to use it
-Index: Absolutly, yes
-Template: default
----
-
 # Jfever
 
 Jfever is (yet another) simple *live* static web site generator
