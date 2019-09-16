@@ -21,22 +21,22 @@ import (
 
 // Site structure : FOLDER
 type FOLDER struct {
-  Site      *Site
-	Path      string        // part of path relatif to SRC and OUT
-	Name      string        // navigation name
-	outfiles  []os.FileInfo // (extra) files in Out
-	srcfiles  []os.FileInfo // Source files
+	Site     *Site
+	Path     string        // part of path relatif to SRC and OUT
+	Name     string        // navigation name
+	outfiles []os.FileInfo // (extra) files in Out
+	srcfiles []os.FileInfo // Source files
 
 	// SiteMap links
 	Subdirs []*FOLDER // subdirectories
 	Pages   PAGES     // pages in this folder
 	index   *PAGE     // index page
- 
+
 }
 
 // Site structure : Page
 type PAGE struct {
-  Root    *FOLDER // shortcut to root folder
+	Root    *FOLDER // shortcut to root folder
 	Folder  *FOLDER // contening folder
 	SrcName string  // source .md file name
 	DstName string  // destination (slug) name
@@ -55,15 +55,15 @@ type PAGES []*PAGE
 
 // flatten SiteMap structure: topic
 type UrlEntry struct {
-  EIndent    int     // Entry indent level
-  Url       string  // URL
-  Display   string  // Display name
+	EIndent int    // Entry indent level
+	Url     string // URL
+	Display string // Display name
 }
 
 // Site data
 type Site struct {
 	RootFOLDER *FOLDER // root FOLDER
-	SiteMap []UrlEntry
+	SiteMap    []UrlEntry
 }
 
 // return the full Out path
@@ -93,7 +93,7 @@ func init() {
 	// Add the custom functions to Amber in the init(), since this is global
 	// (package) state in my Amber fork.
 	amber.AddFuncs(funcs)
-  
+
 }
 
 // Sort pages in same folder
@@ -119,8 +119,8 @@ func compileTemplates() (err error) {
 
 // scan a directory tree and generate outputs
 func genPath(dir string) {
-  // copy all static assets first
-  copyFolder(StaticDirs, PublicDir)
+	// copy all static assets first
+	copyFolder(StaticDirs, PublicDir)
 
 	site.RootFOLDER = FOLDERTree("/")
 	site.RootFOLDER.BuildTree()
@@ -153,22 +153,22 @@ func FOLDERTree(dir string) *FOLDER {
 
 // Build a simple navigation tree with ul/li
 func (site *Site) BuildMap() {
-  site.SiteMap = []UrlEntry{}
-  site.RootFOLDER.UrlEntries(0)
+	site.SiteMap = []UrlEntry{}
+	site.RootFOLDER.UrlEntries(0)
 }
 
 // apped TOC of current folder to flatten navigation TOC
 func (folder *FOLDER) UrlEntries(eident int) {
 
-  // add pages first
+	// add pages first
 	for _, pa := range folder.Pages {
-		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: path.Join(folder.Path , pa.DstName), Display: pa.DstName})
+		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: path.Join(folder.Path, pa.DstName), Display: pa.DstName})
 	}
 
 	// buil all page for current folder
 	for _, fi := range folder.Subdirs {
-		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: fi.Path+"/", Display: fi.Name+"/"})
-    fi.UrlEntries(eident+1)
+		site.SiteMap = append(site.SiteMap, UrlEntry{EIndent: eident, Url: fi.Path + "/", Display: fi.Name + "/"})
+		fi.UrlEntries(eident + 1)
 	}
 
 }
@@ -213,7 +213,7 @@ func (folder *FOLDER) copy(src string) {
 	fsrc := filepath.Join(folder.GetSrcDir(), src)
 	fdst := filepath.Join(folder.GetOutDir(), src)
 
-  err := copyFile(fsrc, fdst)
+	err := copyFile(fsrc, fdst)
 	if err != nil {
 		ERROR(err.Error())
 		return
@@ -222,7 +222,7 @@ func (folder *FOLDER) copy(src string) {
 }
 
 // Copy a file from src to dst
-func copyFile(fsrc, fdst string) error{
+func copyFile(fsrc, fdst string) error {
 	inf, err := os.Open(fsrc)
 	if err != nil {
 		return err
@@ -239,39 +239,39 @@ func copyFile(fsrc, fdst string) error{
 	if err != nil {
 		return err
 	}
-  return nil
+	return nil
 }
 
 // Copy a folder tree
-func copyFolder(fsrc, fdst string) error{
-  // mkdir -p
+func copyFolder(fsrc, fdst string) error {
+	// mkdir -p
 	os.MkdirAll(fdst, 0755)
-  
-  // copy file first
+
+	// copy file first
 	files, err := ioutil.ReadDir(fsrc)
 	if err != nil {
 		return err
 	}
 	// walk all files first
 	for _, fi := range files {
-    if !fi.IsDir() {
-      fin := fi.Name()
-      err := copyFile(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
-      if err != nil {
-        WARN(err.Error())
-      }
-    }
+		if !fi.IsDir() {
+			fin := fi.Name()
+			err := copyFile(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
+			if err != nil {
+				WARN(err.Error())
+			}
+		}
 	}
 
 	// walk all subfolder
 	for _, fi := range files {
-    if fi.IsDir() {
-      fin := fi.Name()
-      err := copyFolder(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
-      if err != nil {
-        WARN(err.Error())
-      }
-    }
+		if fi.IsDir() {
+			fin := fi.Name()
+			err := copyFolder(filepath.Join(fsrc, fin), filepath.Join(fdst, fin))
+			if err != nil {
+				WARN(err.Error())
+			}
+		}
 	}
 	return nil
 }
@@ -342,10 +342,10 @@ func generateSite() error {
 // create newpage, fill with metadata, but don't render template yet
 func (folder *FOLDER) newPage(mdf string) {
 	var p PAGE = PAGE{
-    Root:     site.RootFOLDER,
-		Folder:   folder,
-		SrcName:  mdf,
-    Meta:     make(TemplateData),
+		Root:    site.RootFOLDER,
+		Folder:  folder,
+		SrcName: mdf,
+		Meta:    make(TemplateData),
 	}
 
 	fpath := filepath.Join(folder.GetSrcDir(), mdf)
@@ -378,10 +378,10 @@ func (folder *FOLDER) newPage(mdf string) {
 		WARN("Cannot read meta from %v(%v)", fpath, err)
 		return
 	}
-  for k, v := range meta {
-    p.Meta[k]=v
-  }
-  p.DstName = p.Meta["Slug"]
+	for k, v := range meta {
+		p.Meta[k] = v
+	}
+	p.DstName = p.Meta["Slug"]
 
 	if _, ok := p.Meta["Index"]; ok {
 		folder.index = &p
