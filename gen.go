@@ -381,6 +381,9 @@ func (folder *FOLDER) newPage(mdf string) {
 		p.Meta[k] = v
 	}
 	p.DstName = p.Meta["Slug"]
+  if t, err := time.Parse("2006-01-02", p.Meta["PubTime"]); err == nil {
+    p.PubTime = t
+  }
 
 	if _, ok := p.Meta["Index"]; ok {
 		folder.index = &p

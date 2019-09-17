@@ -1,5 +1,5 @@
 ---
-Date: 2019-09-15
+PubTime: 2019-08-16
 Title: Jfever, yet another static site generator
 Author: Juju
 Category: technologie, blog, generator, golang
